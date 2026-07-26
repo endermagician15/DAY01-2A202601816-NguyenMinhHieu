@@ -530,19 +530,111 @@ def format_comparison_table(results: list[dict]) -> str:
 # Entry point — demo chạy thật (cần OPENAI_API_KEY)
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    print("=== So sánh model ===")
-    result = compare_models(
-        "Giải thích khác biệt giữa temperature và top_p trong một câu."
-    )
-    for key, value in result.items():
-        print(f"{key}: {value}")
+    print("==================================================================")
+    print("      CHẠY CÁC THÍ NGHIỆM VÀ IN Ý CHO 9 CÂU HỎI TRONG MARKDOWN     ")
+    print("==================================================================\n")
 
-    print("\n=== Trợ lý CLI (gõ 'quit' để thoát) ===")
-    stats = run_assistant(
-        persona="Bạn là trợ giảng thân thiện của khóa AI, "
-                "trả lời ngắn gọn bằng tiếng Việt.",
+    # =======================================================================
+    # BLOCK 1: API CƠ BẢN
+    # =======================================================================
+    print("--- [BLOCK 1] API CƠ BẢN ---")
+
+    # Câu 1.1 — Độ nhạy của temperature
+    print("\n[Câu 1.1] Chạy call_openai với các mức temperature khác nhau:")
+    prompt_hanoi = "Hãy kể cho tôi một sự thật thú vị về Hà Nội."
+    temperatures = [0.0, 0.7, 1.2, 1.8]
+    for temp in temperatures:
+        print(f"\n--- Temperature = {temp} ---")
+        try:
+            res, lat = call_openai(prompt=prompt_hanoi, temperature=temp, max_tokens=150)
+            print(f"Latency: {lat:.2f}s")
+            print(f"Response: {res.strip()}")
+        except Exception as e:
+            print(f"Lỗi khi gọi API: {e}")
+
+    # Câu 1.3 — Đánh đổi chi phí
+    print("\n\n[Câu 1.3] Ước tính chi phí (Workload: 20,000 users * 2 calls/day * 500 output tokens):")
+    total_tokens = 20000 * 2 * 500  # 20,000,000 tokens
+    cost_gpt4o = (total_tokens / 1000) * PRICING_PER_1K_TOKENS["gpt-4o"]["output"]
+    cost_mini = (total_tokens / 1000) * PRICING_PER_1K_TOKENS["gpt-4o-mini"]["output"]
+    print(f"- Chi phí GPT-4o   : ${cost_gpt4o:.2f} / ngày")
+    print(f"- Chi phí GPT-4o-mini: ${cost_mini:.2f} / ngày")
+
+
+    # =======================================================================
+    # BLOCK 2: SYSTEM PROMPT & TOKEN
+    # =======================================================================
+    print("\n\n--- [BLOCK 2] SYSTEM PROMPT & TOKEN ---")
+
+    # Câu 2.1 — Sức mạnh của persona
+    print("\n[Câu 2.1] Chạy chat_with_system_prompt với 2 personas khác nhau:")
+    prompt_ml = "Giải thích máy học (machine learning) là gì?"
+    persona_poet = "Bạn là một nhà thơ, trả lời mọi thứ bằng hình ảnh ví von, tránh thuật ngữ."
+    persona_engineer = "Bạn là kỹ sư phần mềm senior, trả lời chính xác, có ví dụ code khi phù hợp."
+
+    res_poet, _ = chat_with_system_prompt(persona_poet, prompt_ml, max_tokens=200)
+    res_eng, _ = chat_with_system_prompt(persona_engineer, prompt_ml, max_tokens=200)
+
+    print(f"\n[Persona Nhà thơ]:\n{res_poet.strip()}")
+    print(f"\n[Persona Kỹ sư Senior]:\n{res_eng.strip()}")
+
+    # Câu 2.2 — tiktoken vs đếm từ
+    print("\n\n[Câu 2.2] So sánh số token bằng tiktoken vs ước lượng thô (từ / 0.75):")
+    text_vn = (
+        "Hà Nội là thủ đô của nước Cộng hòa Xã hội Chủ nghĩa Việt Nam, "
+        "thành phố lớn nhất Việt Nam về diện tích và cũng là địa phương đứng thứ hai "
+        "về dân số. Hà Nội nằm ở trung tâm vùng đồng bằng sông Hồng, là trung tâm "
+        "chính trị, văn hóa và là trung tâm kinh tế lớn của đất nước."
     )
-    print("\n--- Thống kê phiên chat ---")
-    for key, value in stats.items():
-        if key != "history":
-            print(f"{key}: {value}")
+    word_count = len(text_vn.split())
+    rough_tokens = word_count / 0.75
+    exact_tokens = count_tokens(text_vn, model=OPENAI_MODEL)
+
+    print(f"- Đoạn văn thử nghiệm ({word_count} từ):")
+    print(f"- Đếm thực tế (tiktoken): {exact_tokens} tokens")
+    print(f"- Ước lượng thô (từ / 0.75): {rough_tokens:.1f} tokens")
+    diff_pct = abs(exact_tokens - rough_tokens) / exact_tokens * 100
+    print(f"- Độ lệch: {diff_pct:.2f}%")
+
+
+    # =======================================================================
+    # BLOCK 4: MINI-PROJECT
+    # =======================================================================
+    print("\n\n--- [BLOCK 4] MINI-PROJECT ---")
+
+    # Câu 4.1 — Thiết kế persona
+    print("\n[Câu 4.1] Demo System Prompt và ràng buộc:")
+    persona_demo = (
+        "Bạn là trợ lý tư vấn lập trình Python. Hãy giải thích ngắn gọn bản chất vấn đề "
+        "và chỉ đưa ra cú pháp/hướng dẫn. (1) Không tạo đoạn mã (code mẫu) hoàn chỉnh. "
+        "(2) Trả lời hoàn toàn bằng tiếng Việt."
+    )
+    print(f"System Prompt được sử dụng:\n\"{persona_demo}\"")
+
+    # Câu 4.2 — Hạn chế & cải thiện + Chạy thử Assistant
+    print("\n[Câu 4.2] Chạy mô phỏng trợ lý với max_turns = 1 lượt:")
+    # Giả lập input tự động để chạy thử không bị dừng chờ bàn phím
+    inputs = iter(["Xin chào, hãy giải thích decorator trong Python ngắn gọn."])
+    demo_assistant_stats = run_assistant(
+        persona=persona_demo,
+        get_input=lambda: next(inputs, "quit"),
+        max_turns=1
+    )
+
+    print("\n--- Thống kê phiên chat mẫu ---")
+    for k, v in demo_assistant_stats.items():
+        if k != "history":
+            print(f"- {k}: {v}")
+
+
+    # Demo CLI Part 4
+    print("\n\n[Câu 4.3] Chatbot tương tác đa lượt (max_turns = 5) với persona vừa thiết kế:")
+    demo_assistant_stats = run_assistant(
+        persona=persona_demo,
+        max_turns=5,
+    )
+
+    print("\n--- Thống kê phiên chat mẫu ---")
+    for k, v in demo_assistant_stats.items():
+        if k != "history":
+            print(f"- {k}: {v}")
